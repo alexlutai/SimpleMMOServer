@@ -15,7 +15,9 @@ class Program
         // Nu mai e nevoie de HttpListener separat!
         FleckLog.Level = LogLevel.Info;
 
-        var server = new WebSocketServer($"ws://0.0.0.0:{port}");
+        // ⚠️ IMPORTANT: Folosește http:// pentru Render (nu ws://)
+        // Render face routing automat la WebSocket
+        var server = new WebSocketServer($"http://0.0.0.0:{port}");
 
         // ✅ Render verifică health prin request HTTP simplu
         // Fleck răspunde automat la request-uri non-WebSocket
