@@ -1,148 +1,167 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using System.Threading;
 using Fleck;
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8181";
-var players = new Dictionary<IWebSocketConnection, Player>();
-
-var server = new WebSocketServer($"ws://0.0.0.0:{port}");
-
-server.Start(socket =>
+class Program
 {
-    socket.OnOpen = () =>
+    static void Main(string[] args)
     {
-        var player = new Player
-        {
-            Id = Guid.NewGuid().ToString(),
-            X = 0,
-            Y = 0,
-            Z = 0
-        };
+        var port = Environment.GetEnvironmentVariable("PORT") ?? "8181";
+        var players = new Dictionary<IWebSocketConnection, Player>();
 
-        players[socket] = player;
+        var server = new WebSocketServer($"ws://0.0.0.0:{port}");
 
-        // 1️⃣ trimite ID-ul propriu
-        socket.Send(JsonSerializer.Serialize(new
+        server.Start(socket =>
         {
-            type = "init",
-            id = player.Id
-        }));
-
-        // 2️⃣ trimite NOULUI client toți playerii EXISTENȚI
-        foreach (var kvp in players)
-        {
-            if (kvp.Key == socket) continue;
-            
-            var p = kvp.Value;
-            socket.Send(JsonSerializer.Serialize(new
+            socket.OnOpen = () =>
             {
-                type = "player_join",
-                id = p.Id,
-                x = p.X,
-                y = p.Y,
-                z = p.Z
-            }));
-        }
-
-        // 3️⃣ anunță toți CEILALȚI despre NOUL player
-        foreach (var s in players.Keys)
-        {
-            if (s == socket) continue;
-
-            s.Send(JsonSerializer.Serialize(new
-            {
-                type = "player_join",
-                id = player.Id,
-                x = player.X,
-                y = player.Y,
-                z = player.Z
-            }));
-        }
-
-        Console.WriteLine($"Player {player.Id} connected");
-    };
-
-    socket.OnMessage = message =>
-    {
-        var baseData = JsonSerializer.Deserialize<BaseMessage>(message);
-        
-        if (baseData?.type == "move")
-        {
-            var data = JsonSerializer.Deserialize<MoveMessage>(message);
-            if (!players.ContainsKey(socket)) return;
-            
-            var p = players[socket];
-            p.X = data.x;
-            p.Y = data.y;
-            p.Z = data.z;
-
-            // Trimite DOAR la CEILALȚI
-            foreach (var s in players.Keys)
-            {
-                if (s == socket) continue;
-                
-                s.Send(JsonSerializer.Serialize(new
+                var player = new Player
                 {
-                    type = "player_move",
-                    id = p.Id,
-                    x = p.X,
-                    y = p.Y,
-                    z = p.Z
-                }));
-            }
-            
-            Console.WriteLine($"Player {p.Id} moved to ({p.X}, {p.Y}, {p.Z})");
-        }
-        else if (baseData?.type == "chat")
-        {
-            // ✅ CHAT MESSAGE
-            var chatData = JsonSerializer.Deserialize<ChatMessage>(message);
-            if (!players.ContainsKey(socket)) return;
-            
-            var senderId = players[socket].Id;
-            
-            // Broadcast la TOȚI (inclusiv expeditor)
-            foreach (var s in players.Keys)
-            {
-                s.Send(JsonSerializer.Serialize(new
+                    Id = Guid.NewGuid().ToString(),
+                    X = 0,
+                    Y = 0,
+                    Z = 0
+                };
+
+                players[socket] = player;
+
+                // Trimite ID-ul propriu
+                socket.Send(JsonSerializer.Serialize(new
                 {
-                    type = "chat",
-                    id = senderId,
-                    message = chatData.message,
-                    timestamp = DateTime.Now.ToString("HH:mm:ss")
+                    type = "init",
+                    id = player.Id
                 }));
-            }
-            
-            Console.WriteLine($"[CHAT] {senderId}: {chatData.message}");
-        }
-    };
 
-    socket.OnClose = () =>
-    {
-        if (!players.ContainsKey(socket))
-            return;
+                // Trimite NOULUI client toți playerii EXISTENȚI
+                foreach (var kvp in players)
+                {
+                    if (kvp.Key == socket) continue;
 
-        var id = players[socket].Id;
-        players.Remove(socket);
+                    var p = kvp.Value;
+                    socket.Send(JsonSerializer.Serialize(new
+                    {
+                        type = "player_join",
+                        id = p.Id,
+                        x = p.X,
+                        y = p.Y,
+                        z = p.Z
+                    }));
+                }
 
-        foreach (var s in players.Keys)
-        {
-            s.Send(JsonSerializer.Serialize(new
+                // Anunță toți CEILALȚI despre NOUL player
+                foreach (var s in players.Keys)
+                {
+                    if (s == socket) continue;
+
+                    s.Send(JsonSerializer.Serialize(new
+                    {
+                        type = "player_join",
+                        id = player.Id,
+                        x = player.X,
+                        y = player.Y,
+                        z = player.Z
+                    }));
+                }
+
+                Console.WriteLine($"✅ Player {player.Id.Substring(0, 8)} connected. Total: {players.Count}");
+            };
+
+            socket.OnMessage = message =>
             {
-                type = "player_leave",
-                id = id
-            }));
-        }
+                try
+                {
+                    var baseData = JsonSerializer.Deserialize<BaseMessage>(message);
 
-        Console.WriteLine($"Player {id} disconnected");
-    };
-});
+                    if (baseData?.type == "move")
+                    {
+                        var data = JsonSerializer.Deserialize<MoveMessage>(message);
+                        if (!players.ContainsKey(socket)) return;
 
-Console.WriteLine("Server running on port 8181");
+                        var p = players[socket];
+                        p.X = data.x;
+                        p.Y = data.y;
+                        p.Z = data.z;
 
+                        // Trimite DOAR la CEILALȚI
+                        foreach (var s in players.Keys)
+                        {
+                            if (s == socket) continue;
 
-// ✅ Clase
+                            s.Send(JsonSerializer.Serialize(new
+                            {
+                                type = "player_move",
+                                id = p.Id,
+                                x = p.X,
+                                y = p.Y,
+                                z = p.Z
+                            }));
+                        }
+                    }
+                    else if (baseData?.type == "chat")
+                    {
+                        var chatData = JsonSerializer.Deserialize<ChatMessage>(message);
+                        if (!players.ContainsKey(socket)) return;
+
+                        var senderId = players[socket].Id;
+
+                        // Broadcast la TOȚI (inclusiv expeditor)
+                        foreach (var s in players.Keys)
+                        {
+                            s.Send(JsonSerializer.Serialize(new
+                            {
+                                type = "chat",
+                                id = senderId,
+                                message = chatData.message,
+                                timestamp = DateTime.UtcNow.ToString("HH:mm:ss")
+                            }));
+                        }
+
+                        Console.WriteLine($"💬 [{senderId.Substring(0, 8)}]: {chatData.message}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error processing message: {ex.Message}");
+                }
+            };
+
+            socket.OnClose = () =>
+            {
+                if (!players.ContainsKey(socket))
+                    return;
+
+                var id = players[socket].Id;
+                players.Remove(socket);
+
+                foreach (var s in players.Keys)
+                {
+                    s.Send(JsonSerializer.Serialize(new
+                    {
+                        type = "player_leave",
+                        id = id
+                    }));
+                }
+
+                Console.WriteLine($"❌ Player {id.Substring(0, 8)} disconnected. Total: {players.Count}");
+            };
+
+            socket.OnError = (ex) =>
+            {
+                Console.WriteLine($"⚠️ Socket error: {ex.Message}");
+            };
+        });
+
+        Console.WriteLine($"🚀 Server running on port {port}");
+        Console.WriteLine("📡 Ready to accept connections...");
+
+        // Ține serverul pornit la infinit
+        Thread.Sleep(Timeout.Infinite);
+    }
+}
+
+// Clase
 class Player
 {
     public string Id { get; set; } = "";
