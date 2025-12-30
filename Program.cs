@@ -14,11 +14,9 @@ class Program
         // ✅ Fleck suportă automat HTTP->WebSocket upgrade
         // Nu mai e nevoie de HttpListener separat!
         FleckLog.Level = LogLevel.Info;
-
-        // ⚠️ IMPORTANT: Folosește http:// pentru Render (nu ws://)
-        // Render face routing automat la WebSocket
-        var server = new WebSocketServer($"http://0.0.0.0:{port}");
-
+        
+        var server = new WebSocketServer($"ws://0.0.0.0:{port}");
+        
         // ✅ Render verifică health prin request HTTP simplu
         // Fleck răspunde automat la request-uri non-WebSocket
         server.SupportedSubProtocols = new[] { "binary", "base64" };
