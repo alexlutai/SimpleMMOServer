@@ -1,9 +1,11 @@
-﻿using Fleck;
+﻿using System;
+using System.Collections.Generic;
 using System.Text.Json;
+using Fleck;
 
-var players = new Dictionary<IWebSocketConnection, Player>();
-///192.168.100.61:8181
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8181";
+var players = new Dictionary<IWebSocketConnection, Player>();
+
 var server = new WebSocketServer($"ws://0.0.0.0:{port}");
 
 server.Start(socket =>
