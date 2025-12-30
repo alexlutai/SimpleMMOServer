@@ -140,7 +140,7 @@ server.Start(socket =>
 });
 
 Console.WriteLine("Server running on port 8181");
-Console.ReadLine();
+
 
 // ✅ Clase
 class Player
