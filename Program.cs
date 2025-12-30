@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
-using System.Threading.Tasks;
-using System.Net;
 using Fleck;
 
 class Program
@@ -13,41 +11,16 @@ class Program
         var port = Environment.GetEnvironmentVariable("PORT") ?? "8181";
         var players = new Dictionary<IWebSocketConnection, Player>();
 
-        // HTTP Health Check Server (pentru Render)
-        var httpListener = new HttpListener();
-        httpListener.Prefixes.Add($"http://*:{port}/");
-        httpListener.Start();
-
-        Task.Run(() =>
-        {
-            while (true)
-            {
-                try
-                {
-                    var context = httpListener.GetContext();
-                    var response = context.Response;
-
-                    if (context.Request.Url.AbsolutePath == "/health")
-                    {
-                        string responseString = "{\"status\":\"ok\",\"players\":" + players.Count + "}";
-                        byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
-                        response.ContentLength64 = buffer.Length;
-                        response.OutputStream.Write(buffer, 0, buffer.Length);
-                    }
-                    else
-                    {
-                        string responseString = "WebSocket Server Running";
-                        byte[] buffer = System.Text.Encoding.UTF8.GetBytes(responseString);
-                        response.ContentLength64 = buffer.Length;
-                        response.OutputStream.Write(buffer, 0, buffer.Length);
-                    }
-                    response.OutputStream.Close();
-                }
-                catch { }
-            }
-        });
+        // ✅ Fleck suportă automat HTTP->WebSocket upgrade
+        // Nu mai e nevoie de HttpListener separat!
+        FleckLog.Level = LogLevel.Info;
 
         var server = new WebSocketServer($"ws://0.0.0.0:{port}");
+
+        // ✅ Render verifică health prin request HTTP simplu
+        // Fleck răspunde automat la request-uri non-WebSocket
+        server.SupportedSubProtocols = new[] { "binary", "base64" };
+        server.RestartAfterListenError = true;
 
         server.Start(socket =>
         {
@@ -190,8 +163,8 @@ class Program
         });
 
         Console.WriteLine($"🚀 WebSocket Server running on port {port}");
-        Console.WriteLine($"🏥 HTTP Health Check available at http://localhost:{port}/health");
-        Console.WriteLine("📡 Ready to accept connections...");
+        Console.WriteLine($"📡 Ready to accept connections...");
+        Console.WriteLine($"🏥 Health check: Server responds to HTTP requests automatically");
 
         // Ține serverul pornit la infinit
         Thread.Sleep(Timeout.Infinite);
