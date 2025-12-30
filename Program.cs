@@ -3,7 +3,8 @@ using System.Text.Json;
 
 var players = new Dictionary<IWebSocketConnection, Player>();
 ///192.168.100.61:8181
-var server = new WebSocketServer("ws://172.27.104.26:8181");
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8181";
+var server = new WebSocketServer($"ws://0.0.0.0:{port}");
 
 server.Start(socket =>
 {
